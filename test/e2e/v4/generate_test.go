@@ -47,14 +47,14 @@ func GenerateV4(kbc *utils.TestContext) {
 		"--programmatic-validation",
 		"--make=false",
 	)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to scaffolding mutating webhook")
 
 	By("implementing the mutating and validating webhooks")
 	webhookFilePath := filepath.Join(
 		kbc.Dir, "internal/webhook", kbc.Version,
 		fmt.Sprintf("%s_webhook.go", strings.ToLower(kbc.Kind)))
 	err = utils.ImplementWebhooks(webhookFilePath, strings.ToLower(kbc.Kind))
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to implement webhooks")
 
 	scaffoldConversionWebhook(kbc)
 
@@ -70,7 +70,7 @@ func GenerateV4(kbc *utils.TestContext) {
 		certManagerTarget, "#")).To(Succeed())
 	ExpectWithOffset(1, pluginutil.UncommentCode(
 		filepath.Join(kbc.Dir, "config", "prometheus", "kustomization.yaml"),
-		monitorTlsPatch, "#")).To(Succeed())
+		monitorTLSPatch, "#")).To(Succeed())
 	ExpectWithOffset(1, pluginutil.UncommentCode(
 		filepath.Join(kbc.Dir, "config", "default", "kustomization.yaml"),
 		metricsCertPatch, "#")).To(Succeed())
@@ -95,14 +95,14 @@ func GenerateV4WithoutMetrics(kbc *utils.TestContext) {
 		"--programmatic-validation",
 		"--make=false",
 	)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to scaffolding mutating webhook")
 
 	By("implementing the mutating and validating webhooks")
 	webhookFilePath := filepath.Join(
 		kbc.Dir, "internal/webhook", kbc.Version,
 		fmt.Sprintf("%s_webhook.go", strings.ToLower(kbc.Kind)))
 	err = utils.ImplementWebhooks(webhookFilePath, strings.ToLower(kbc.Kind))
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to implement webhooks")
 
 	scaffoldConversionWebhook(kbc)
 
@@ -158,14 +158,14 @@ func GenerateV4WithNetworkPolicies(kbc *utils.TestContext) {
 		"--programmatic-validation",
 		"--make=false",
 	)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to scaffolding mutating webhook")
 
 	By("implementing the mutating and validating webhooks")
 	webhookFilePath := filepath.Join(
 		kbc.Dir, "internal/webhook", kbc.Version,
 		fmt.Sprintf("%s_webhook.go", strings.ToLower(kbc.Kind)))
 	err = utils.ImplementWebhooks(webhookFilePath, strings.ToLower(kbc.Kind))
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to implement webhooks")
 
 	scaffoldConversionWebhook(kbc)
 
@@ -186,7 +186,7 @@ func GenerateV4WithNetworkPolicies(kbc *utils.TestContext) {
 		metricsCertReplaces, "#")).To(Succeed())
 	ExpectWithOffset(1, pluginutil.UncommentCode(
 		filepath.Join(kbc.Dir, "config", "prometheus", "kustomization.yaml"),
-		monitorTlsPatch, "#")).To(Succeed())
+		monitorTLSPatch, "#")).To(Succeed())
 
 	By("uncomment kustomization.yaml to enable network policy")
 	ExpectWithOffset(1, pluginutil.UncommentCode(
@@ -222,7 +222,7 @@ func creatingAPI(kbc *utils.TestContext) {
 		"--controller",
 		"--make=false",
 	)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to create API")
 
 	By("implementing the API")
 	ExpectWithOffset(1, pluginutil.InsertCode(
@@ -241,7 +241,7 @@ func initingTheProject(kbc *utils.TestContext) {
 		"--project-version", "3",
 		"--domain", kbc.Domain,
 	)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to initialize project")
 }
 
 const metricsTarget = `- path: manager_metrics_patch.yaml
@@ -454,7 +454,7 @@ func uncommentKustomizeCoversion(kbc *utils.TestContext) {
 		fmt.Sprintf(certName, kbc.Group, kbc.Domain), "#")).To(Succeed())
 }
 
-const monitorTlsPatch = `#patches:
+const monitorTLSPatch = `#patches:
 #  - path: monitor_tls_patch.yaml
 #    target:
 #      kind: ServiceMonitor`

@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes authors.
+Copyright 2025 The Kubernetes authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,6 +65,16 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	var err error
+	scheme := apimachineryruntime.NewScheme()
+	err = certmanagerv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = admissionv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	// +kubebuilder:scaffold:scheme
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "..", "config", "crd", "bases")},
@@ -80,20 +90,10 @@ var _ = BeforeSuite(func() {
 		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
 	}
 
-	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-
-	scheme := apimachineryruntime.NewScheme()
-	err = certmanagerv1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = admissionv1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())

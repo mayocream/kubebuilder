@@ -26,10 +26,12 @@ import (
 	"sigs.k8s.io/kubebuilder/v4/test/e2e/utils"
 )
 
+// Sample define the sample which will be scaffolded
 type Sample struct {
 	ctx *utils.TestContext
 }
 
+// NewSample create a new instance of the sample and configure the KB CLI that will be used
 func NewSample(binaryPath, samplePath string) Sample {
 	log.Infof("Generating the sample context of MultiVersion Cronjob...")
 	ctx := hackutils.NewSampleContext(binaryPath, samplePath, "GO111MODULE=on")
@@ -43,6 +45,7 @@ func (sp *Sample) Prepare() {
 	hackutils.CheckError("creating directory for multiversion project", err)
 }
 
+// GenerateSampleProject will generate the sample
 func (sp *Sample) GenerateSampleProject() {
 	log.Infof("Initializing the multiversion cronjob project")
 
@@ -88,13 +91,14 @@ func (sp *Sample) GenerateSampleProject() {
 	hackutils.CheckError("Creating defaulting and validation webhook for v2", err)
 }
 
+// UpdateTutorial the muilt-version sample tutorial with the scaffold changes
 func (sp *Sample) UpdateTutorial() {
 	log.Println("Update tutorial with multiversion code")
 
 	// Update files according to the multiversion
 	sp.updateCronjobV1DueForce()
-	sp.updateApiV1()
-	sp.updateApiV2()
+	sp.updateAPIV1()
+	sp.updateAPIV2()
 	sp.updateWebhookV2()
 	sp.updateConversionFiles()
 	sp.updateSampleV2()
@@ -379,7 +383,7 @@ Most of the conversion is straightforward copying, except for converting our cha
 	hackutils.CheckError("replace covert info at hub v2", err)
 }
 
-func (sp *Sample) updateApiV1() {
+func (sp *Sample) updateAPIV1() {
 	path := "api/v1/cronjob_types.go"
 	err := pluginutil.InsertCode(
 		filepath.Join(sp.ctx.Dir, path),
@@ -655,7 +659,7 @@ CronJob controller's `+"`SetupWithManager`"+` method.
 
 }
 
-func (sp *Sample) updateApiV2() {
+func (sp *Sample) updateAPIV2() {
 	path := "api/v2/cronjob_types.go"
 	err := pluginutil.InsertCode(
 		filepath.Join(sp.ctx.Dir, path),
@@ -734,6 +738,7 @@ type CronJobStatus struct {
 	hackutils.CheckError("append marker at the end of the docs", err)
 }
 
+// CodeGen will call targets to generate code
 func (sp *Sample) CodeGen() {
 	cmd := exec.Command("make", "all")
 	_, err := sp.ctx.Run(cmd)

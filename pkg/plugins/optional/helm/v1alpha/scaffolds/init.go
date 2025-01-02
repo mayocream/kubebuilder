@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v4/pkg/plugins/golang/deploy-image/v1alpha1"
 	"sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm"
 	"sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates"
-	chart_templates "sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates/chart-templates"
+	charttemplates "sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates/chart-templates"
 	templatescertmanager "sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates/chart-templates/cert-manager"
 	"sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates/chart-templates/manager"
 	templatesmetrics "sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha/scaffolds/internal/templates/chart-templates/metrics"
@@ -93,20 +93,20 @@ func (s *initScaffolder) Scaffold() error {
 			Force:        s.force,
 		},
 		&templates.HelmIgnore{},
-		&chart_templates.HelmHelpers{},
-		&manager.ManagerDeployment{
+		&charttemplates.HelmHelpers{},
+		&manager.Deployment{
 			Force:        s.force,
 			DeployImages: len(imagesEnvVars) > 0,
 			HasWebhooks:  len(webhooks) > 0,
 		},
 		&templatescertmanager.Certificate{},
-		&templatesmetrics.MetricsService{},
+		&templatesmetrics.Service{},
 		&prometheus.Monitor{},
 	}
 
 	if len(webhooks) > 0 {
-		buildScaffold = append(buildScaffold, &templateswebhooks.WebhookTemplate{})
-		buildScaffold = append(buildScaffold, &templateswebhooks.WebhookService{})
+		buildScaffold = append(buildScaffold, &templateswebhooks.Template{})
+		buildScaffold = append(buildScaffold, &templateswebhooks.Service{})
 	}
 
 	if err := scaffold.Execute(buildScaffold...); err != nil {

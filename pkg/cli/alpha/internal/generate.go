@@ -38,6 +38,7 @@ import (
 	hemlv1alpha "sigs.k8s.io/kubebuilder/v4/pkg/plugins/optional/helm/v1alpha"
 )
 
+// Generate store the required info for the command
 type Generate struct {
 	InputDir  string
 	OutputDir string
@@ -81,12 +82,7 @@ func (opts *Generate) Generate() error {
 			return err
 		}
 	}
-
-	if err := migrateDeployImagePlugin(config); err != nil {
-		return err
-	}
-
-	return nil
+	return migrateDeployImagePlugin(config)
 }
 
 // Validate ensures the options are valid and kubebuilder is installed.
