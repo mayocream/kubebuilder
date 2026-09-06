@@ -54,6 +54,8 @@ const (
 	pluginGoKubebuilderV4           = "go.kubebuilder.io/v4"
 	pluginGoKubebuilderV3           = "go.kubebuilder.io/v3"
 	pluginGoKubebuilderV2           = "go.kubebuilder.io/v2"
+	pluginGoKubebuilderV3Alpha      = pluginGoKubebuilderV3 + "-alpha"
+	pluginGoKubebuilderV4Alpha      = pluginGoKubebuilderV4 + "-alpha"
 	generateSubcommand              = "generate"
 
 	pluginsFlagDescription = "Comma-separated list of plugin keys to use. " +
@@ -484,10 +486,15 @@ func patchProjectFileInMemoryIfNeeded(fs afero.Fs, path string) error {
 		New string
 	}
 
+	// Ordered longest key first. "go.kubebuilder.io/v3" is a prefix of
+	// "go.kubebuilder.io/v3-alpha", so replacing it first would leave a
+	// "go.kubebuilder.io/v4-alpha" that no plugin provides. That key shipped as
+	// a real plugin until go/v4 stabilized it, so it is retired here as well.
 	replacements := []pluginReplacement{
-		{pluginGoKubebuilderV2, pluginGoKubebuilderV4},
+		{pluginGoKubebuilderV3Alpha, pluginGoKubebuilderV4},
+		{pluginGoKubebuilderV4Alpha, pluginGoKubebuilderV4},
 		{pluginGoKubebuilderV3, pluginGoKubebuilderV4},
-		{pluginGoKubebuilderV3 + "-alpha", pluginGoKubebuilderV4},
+		{pluginGoKubebuilderV2, pluginGoKubebuilderV4},
 	}
 
 	content, err := afero.ReadFile(fs, path)
