@@ -159,12 +159,13 @@ var _ = Describe("API scaffolding with Server-Side Apply", func() {
 			return string(content)
 		}
 
-		It("should scaffold the genclient and resource markers when SSA is enabled", func() {
+		It("should scaffold the genclient and apply configuration markers when SSA is enabled", func() {
 			content := scaffoldTypes(ssaTestResource("Navigator", true), false)
 
 			Expect(content).To(ContainSubstring("// +genclient"))
-			Expect(content).To(ContainSubstring("// +kubebuilder:resource:path=navigators"))
+			Expect(content).To(ContainSubstring("// +kubebuilder:ac:generate=true"))
 			Expect(content).NotTo(ContainSubstring("+kubebuilder:ac:generate=false"))
+			Expect(content).NotTo(ContainSubstring("+kubebuilder:resource:path="))
 		})
 
 		It("should scaffold the nonNamespaced marker when SSA is enabled for a cluster-scoped kind", func() {
@@ -173,7 +174,8 @@ var _ = Describe("API scaffolding with Server-Side Apply", func() {
 			content := scaffoldTypes(res, false)
 
 			Expect(content).To(ContainSubstring("// +genclient\n// +genclient:nonNamespaced"))
-			Expect(content).To(ContainSubstring("// +kubebuilder:resource:path=admirals,scope=Cluster"))
+			Expect(content).To(ContainSubstring("// +kubebuilder:resource:scope=Cluster"))
+			Expect(content).NotTo(ContainSubstring("+kubebuilder:resource:path="))
 		})
 
 		It("should keep the custom plural in the resource path when SSA is enabled", func() {

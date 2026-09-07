@@ -60,9 +60,9 @@ type NavigatorStatus struct {
 }
 
 // +genclient
+// +kubebuilder:ac:generate=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=navigators
 
 // Navigator is the Schema for the navigators API
 type Navigator struct {
