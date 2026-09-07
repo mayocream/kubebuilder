@@ -10,7 +10,7 @@ The `--ssa` flag is an alpha feature and may change in future releases.
 </aside>
 
 This adds:
-- API markers (`+genclient`, `+kubebuilder:ac:generate=true`, `+kubebuilder:resource:path=<plural>`) for ApplyConfiguration generation
+- API markers (`+genclient`, `+kubebuilder:ac:generate=true`) for ApplyConfiguration generation
 - Makefile integration to generate type-safe ApplyConfiguration types alongside CRD and RBAC manifests
 
 ## When to use it
@@ -46,7 +46,7 @@ appsv1apply "example.com/myproject/api/v1/applyconfiguration/api/v1"
 
 ## Mixing SSA and non-SSA APIs
 
-The `+kubebuilder:ac:generate=true` marker is package-level: it enables ApplyConfiguration generation for all kinds in the same group/version. Kinds scaffolded without `--ssa` include the `+kubebuilder:ac:generate=false` marker, so ApplyConfiguration types are only generated for the kinds that opted in. When you create an API with `--ssa`, kinds previously scaffolded without this marker in that group/version receive it automatically.
+The `+kubebuilder:ac:generate=true` marker in `groupversion_info.go` is package-level: it enables ApplyConfiguration generation for the group/version. Each kind then opts in or out with its own `+kubebuilder:ac:generate` marker: kinds scaffolded with `--ssa` get `=true`, and kinds scaffolded without it get `=false`. When you create an API with `--ssa`, kinds previously scaffolded without this marker in that group/version receive it automatically.
 
 To change which kinds are generated:
 - Set `+kubebuilder:ac:generate=true` above a kind to include it

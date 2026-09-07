@@ -119,18 +119,17 @@ type {{ .Resource.Kind }}Status struct {
 {{- if not .Resource.API.Namespaced }}
 // +genclient:nonNamespaced
 {{- end }}
+// +kubebuilder:ac:generate=true
 {{- else if .SkipApplyConfig }}
 // +kubebuilder:ac:generate=false
 {{- end }}
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-{{- if and (not .Resource.API.Namespaced) (or (not .Resource.IsRegularPlural) .Resource.API.SSA) }}
+{{- if and (not .Resource.API.Namespaced) (not .Resource.IsRegularPlural) }}
 // +kubebuilder:resource:path={{ .Resource.Plural }},scope=Cluster
 {{- else if not .Resource.API.Namespaced }}
 // +kubebuilder:resource:scope=Cluster
 {{- else if not .Resource.IsRegularPlural }}
-// +kubebuilder:resource:path={{ .Resource.Plural }}
-{{- else if .Resource.API.SSA }}
 // +kubebuilder:resource:path={{ .Resource.Plural }}
 {{- end }}
 

@@ -60,9 +60,9 @@ type PrawnStatus struct {
 }
 
 // +genclient
+// +kubebuilder:ac:generate=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=prawns
 
 // Prawn is the Schema for the prawns API
 type Prawn struct {

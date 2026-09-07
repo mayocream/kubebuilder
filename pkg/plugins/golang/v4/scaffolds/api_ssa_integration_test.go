@@ -176,7 +176,7 @@ var _ = Describe("Server-Side Apply (--ssa) Scaffolding", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(typesContent)).To(ContainSubstring("+genclient"),
 			"the regenerated API must keep the SSA markers tracked in the PROJECT file")
-		Expect(string(typesContent)).To(ContainSubstring("+kubebuilder:resource:path=captains"))
+		Expect(string(typesContent)).To(ContainSubstring("+kubebuilder:ac:generate=true"))
 		Expect(string(typesContent)).NotTo(ContainSubstring("+kubebuilder:ac:generate=false"))
 
 		By("verifying the PROJECT file still tracks ssa")
@@ -226,7 +226,8 @@ var _ = Describe("Server-Side Apply (--ssa) Scaffolding", func() {
 			Expect(string(typesContent)).To(ContainSubstring("// +genclient\n// +genclient:nonNamespaced"),
 				"the regenerated cluster-scoped API must keep the SSA client markers")
 			Expect(string(typesContent)).To(ContainSubstring(
-				"// +kubebuilder:resource:path=admirals,scope=Cluster"))
+				"// +kubebuilder:resource:scope=Cluster"))
+			Expect(string(typesContent)).NotTo(ContainSubstring("+kubebuilder:resource:path="))
 		},
 		Entry("when --ssa is provided again", true),
 		Entry("when --ssa is omitted", false),
