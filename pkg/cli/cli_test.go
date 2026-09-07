@@ -2112,6 +2112,26 @@ version: "3"
 			Expect(string(updated)).NotTo(ContainSubstring(pluginGoKubebuilderV3))
 		})
 
+		DescribeTable("should patch a retired Go plugin key to go/v4",
+			func(layout, expected string) {
+				fs := afero.NewMemMapFs()
+				project := func(key string) string {
+					return "domain: example.com\nlayout:\n- " + key + "\nversion: \"3\"\n"
+				}
+				content := project(layout)
+				Expect(afero.WriteFile(fs, yamlstore.DefaultPath,
+					[]byte(content), machinery.DefaultFilePermission)).To(Succeed())
+				Expect(patchProjectFileInMemoryIfNeeded(fs, yamlstore.DefaultPath)).To(Succeed())
+
+				updated, err := afero.ReadFile(fs, yamlstore.DefaultPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(updated)).To(Equal(project(expected)))
+			},
+			Entry("go/v3-alpha", pluginGoKubebuilderV3Alpha, pluginGoKubebuilderV4),
+			Entry("go/v4-alpha", pluginGoKubebuilderV4Alpha, pluginGoKubebuilderV4),
+			Entry("base go/v3 still migrates", "base.go.kubebuilder.io/v3", "base.go.kubebuilder.io/v4"),
+		)
+
 		It("should not modify files that do not need patching", func() {
 			fs := afero.NewMemMapFs()
 			content := `domain: example.com
