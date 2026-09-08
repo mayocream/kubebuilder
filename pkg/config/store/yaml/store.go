@@ -171,12 +171,19 @@ func checkReadable(fs afero.Fs, path string) error {
 }
 
 // checkSavePath verifies that the path can be used to save a configuration. It accepts a missing
-// path for a new configuration and a regular file for an update. Other path types are rejected
-// when the filesystem can identify them.
+// path for a new configuration and a regular file for an update, reached directly or through a
+// symbolic link. Other path types are rejected when the filesystem can identify them.
 func checkSavePath(fs afero.Fs, path string, mustNotExist bool) error {
 	class, err := classifyNoFollow(fs, path)
 	if err != nil {
 		return err
+	}
+
+	if class == pathSymbolicLink {
+		class, err = classifyLinkTarget(fs, path)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch class {
@@ -190,6 +197,21 @@ func checkSavePath(fs afero.Fs, path string, mustNotExist bool) error {
 	default:
 		return nil
 	}
+}
+
+// classifyLinkTarget reports what the symbolic link at the path points at. A link to nothing is
+// reported as the link itself: saving through it would create a file where nobody asked for one.
+func classifyLinkTarget(fs afero.Fs, path string) (pathClass, error) {
+	target, err := classify(fs, path)
+	if err != nil {
+		return pathMissing, err
+	}
+
+	if target == pathMissing {
+		return pathSymbolicLink, nil
+	}
+
+	return target, nil
 }
 
 // LoadFrom implements store.Store interface
@@ -242,7 +264,8 @@ func (s yamlStore) SaveTo(path string) error {
 	}
 
 	// Only a missing path or a regular file can be used for saving. New configurations require
-	// the path to be missing, while existing configurations may update a regular file.
+	// the path to be missing, while existing configurations may update a regular file, even
+	// through a symbolic link.
 	if err := checkSavePath(s.fs, path, s.mustNotExist); err != nil {
 		return store.SaveError{Err: err}
 	}

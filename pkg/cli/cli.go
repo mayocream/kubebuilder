@@ -745,7 +745,7 @@ func (c *CLI) resolvePlugins() error {
 // addSubcommands returns a root command with a subcommand tree reflecting the
 // current project's state.
 func (c *CLI) addSubcommands() {
-	// add the alpha command if it has any subcommands enabled
+	// kubebuilder alpha
 	c.addAlphaCmd()
 
 	// kubebuilder completion
@@ -784,6 +784,7 @@ func (c *CLI) addExtraCommands() error {
 				return fmt.Errorf("command %q already exists", cmd.Name())
 			}
 		}
+		c.checkCommandLineBeforeHooks(cmd)
 		c.cmd.AddCommand(cmd)
 	}
 	return nil

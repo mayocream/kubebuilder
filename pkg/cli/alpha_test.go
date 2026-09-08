@@ -31,31 +31,13 @@ var _ = Describe("addAlphaCmd", func() {
 		}
 	})
 
-	It("should add alpha command to root when alpha commands exist", func() {
+	It("should add the alpha command with its built-in subcommands to root", func() {
 		c.addAlphaCmd()
-		Expect(hasSubCommand(c.cmd, alphaCommand)).To(BeTrue())
-	})
 
-	It("should add alpha command to root when only extra alpha commands exist", func() {
-		c.extraAlphaCommands = []*cobra.Command{
-			{Use: "custom-alpha", Short: "Custom alpha command"},
-		}
-		c.addAlphaCmd()
-		Expect(hasSubCommand(c.cmd, alphaCommand)).To(BeTrue())
-	})
-
-	When("no alpha commands exist", func() {
-		BeforeEach(func() {
-			original := alphaCommands
-			DeferCleanup(func() { alphaCommands = original })
-			alphaCommands = []*cobra.Command{}
-			c.extraAlphaCommands = []*cobra.Command{}
-		})
-
-		It("should not add alpha command to root", func() {
-			c.addAlphaCmd()
-			Expect(hasSubCommand(c.cmd, alphaCommand)).To(BeFalse())
-		})
+		alphaCmd := findSubCommand(c.cmd, alphaCommand)
+		Expect(alphaCmd).NotTo(BeNil())
+		Expect(hasSubCommand(alphaCmd, generateSubcommand)).To(BeTrue())
+		Expect(hasSubCommand(alphaCmd, "update")).To(BeTrue())
 	})
 })
 
@@ -77,14 +59,7 @@ var _ = Describe("addExtraAlphaCommands", func() {
 		err := c.addExtraAlphaCommands()
 		Expect(err).NotTo(HaveOccurred())
 
-		alphaCmd, _ := c.cmd.Commands()[0], false
-		for _, cmd := range c.cmd.Commands() {
-			if cmd.Name() == alphaCommand {
-				alphaCmd = cmd
-				break
-			}
-		}
-		Expect(hasSubCommand(alphaCmd, "extra-alpha")).To(BeTrue())
+		Expect(hasSubCommand(findSubCommand(c.cmd, alphaCommand), "extra-alpha")).To(BeTrue())
 	})
 
 	It("should reject a duplicate alpha command", func() {

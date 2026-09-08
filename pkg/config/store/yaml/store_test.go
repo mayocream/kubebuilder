@@ -405,11 +405,46 @@ layout: ""
 			Expect(target).NotTo(BeAnExistingFile())
 		})
 
-		It("should reject a symbolic link when updating an existing configuration", func() {
+		It("should update the target when the path is a symbolic link to a regular file", func() {
+			skipWithoutSymlinks()
+			link, target := danglingSymlink()
+			Expect(os.WriteFile(target, []byte("outdated"), 0o644)).To(Succeed())
+
+			s.fs = afero.NewOsFs()
+			s.cfg = cfgv3.New()
+			s.mustNotExist = false
+
+			Expect(s.SaveTo(link)).To(Succeed())
+
+			content, err := os.ReadFile(target)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(Equal(commentStr + v3File))
+			expectSymlink(link)
+		})
+
+		It("should report an existing configuration when initializing through a symbolic link to a file", func() {
 			skipWithoutSymlinks()
 			link, target := danglingSymlink()
 			existingContent := []byte(commentStr + v3File)
 			Expect(os.WriteFile(target, existingContent, 0o644)).To(Succeed())
+
+			s.fs = afero.NewOsFs()
+			s.cfg = cfgv3.New()
+			s.mustNotExist = true
+
+			Expect(s.SaveTo(link)).To(MatchError(store.SaveError{
+				Err: fmt.Errorf("configuration already exists in %q", link),
+			}))
+
+			content, err := os.ReadFile(target)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(existingContent))
+			expectSymlink(link)
+		})
+
+		It("should fail without creating the target when updating through a dangling symbolic link", func() {
+			skipWithoutSymlinks()
+			link, target := danglingSymlink()
 
 			s.fs = afero.NewOsFs()
 			s.cfg = cfgv3.New()
@@ -418,14 +453,38 @@ layout: ""
 			Expect(s.SaveTo(link)).To(MatchError(store.SaveError{
 				Err: fmt.Errorf("cannot save configuration to %q: path is a symbolic link", link),
 			}))
-			Expect(target).To(BeAnExistingFile())
-			content, err := os.ReadFile(target)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(content).To(Equal(existingContent))
+			Expect(target).NotTo(BeAnExistingFile())
+			expectSymlink(link)
+		})
 
-			info, err := os.Lstat(link)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(info.Mode() & os.ModeSymlink).NotTo(BeZero())
+		It("should fail when the target of a symbolic link cannot be checked", func() {
+			skipWithoutSymlinks()
+			link, _ := danglingSymlink()
+			statErr := errors.New("permission denied")
+
+			s.fs = &unreachableLinkTargetFs{failingStatFs{Fs: afero.NewOsFs(), path: link, err: statErr}}
+			s.cfg = cfgv3.New()
+			s.mustNotExist = false
+
+			Expect(s.SaveTo(link)).To(MatchError(store.SaveError{
+				Err: fmt.Errorf("failed to check %q: %w", link, statErr),
+			}))
+		})
+
+		It("should fail if the path is a symbolic link to a directory", func() {
+			skipWithoutSymlinks()
+			link, target := danglingSymlink()
+			Expect(os.Mkdir(target, 0o755)).To(Succeed())
+
+			s.fs = afero.NewOsFs()
+			s.cfg = cfgv3.New()
+			s.mustNotExist = false
+
+			Expect(s.SaveTo(link)).To(MatchError(store.SaveError{
+				Err: fmt.Errorf("cannot save configuration to %q: path is a directory", link),
+			}))
+			Expect(target).To(BeADirectory())
+			expectSymlink(link)
 		})
 	})
 
@@ -475,6 +534,15 @@ func skipWithoutSymlinks() {
 	if runtime.GOOS == "windows" {
 		Skip("symlink creation requires elevated privileges on Windows")
 	}
+}
+
+// expectSymlink asserts that the path is still a symbolic link, so nothing replaced it.
+func expectSymlink(path string) {
+	GinkgoHelper()
+
+	info, err := os.Lstat(path)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(info.Mode() & os.ModeSymlink).NotTo(BeZero())
 }
 
 // danglingSymlink creates a symbolic link whose target does not exist, and returns both paths.
@@ -539,6 +607,21 @@ func (f *failingStatFs) Stat(name string) (os.FileInfo, error) {
 	}
 
 	return info, nil
+}
+
+// unreachableLinkTargetFs reports the symbolic link at the path but fails to follow it.
+type unreachableLinkTargetFs struct {
+	failingStatFs
+}
+
+// LstatIfPossible delegates to the wrapped filesystem, so the link itself is still reported.
+func (f *unreachableLinkTargetFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
+	info, lstatCalled, err := f.Fs.(afero.Lstater).LstatIfPossible(name)
+	if err != nil {
+		return nil, lstatCalled, fmt.Errorf("failed to lstat %q: %w", name, err)
+	}
+
+	return info, lstatCalled, nil
 }
 
 // Open counts reads of the configured path before delegating to the wrapped filesystem.
