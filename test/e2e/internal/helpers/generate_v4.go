@@ -206,6 +206,35 @@ func GenerateV4WithoutWebhooks(kbc *utils.TestContext) {
 		"#- ../prometheus", "#")).To(Succeed())
 }
 
+// GenerateV4WithoutConversionWebhook implements a go/v4 plugin project with admission webhooks only.
+// A Helm chart generated from it accepts webhook.enabled=false, which charts with CRD conversion reject.
+func GenerateV4WithoutConversionWebhook(kbc *utils.TestContext) {
+	initingTheProject(kbc)
+	creatingAPI(kbc)
+
+	By("scaffolding mutating and validating webhooks")
+	err := kbc.CreateWebhook(
+		"--group", kbc.Group,
+		"--version", kbc.Version,
+		"--kind", kbc.Kind,
+		"--defaulting",
+		"--programmatic-validation",
+		"--make=false",
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to scaffold admission webhooks")
+
+	By("implementing the mutating and validating webhooks")
+	webhookFilePath := filepath.Join(
+		kbc.Dir, "internal/webhook", kbc.Version,
+		fmt.Sprintf("%s_webhook.go", strings.ToLower(kbc.Kind)))
+	err = utils.ImplementWebhooks(webhookFilePath, strings.ToLower(kbc.Kind))
+	Expect(err).NotTo(HaveOccurred(), "Failed to implement webhooks")
+
+	ExpectWithOffset(1, pluginutil.UncommentCode(
+		filepath.Join(kbc.Dir, "config", "default", "kustomization.yaml"),
+		"#- ../prometheus", "#")).To(Succeed())
+}
+
 // GenerateV4WithCustomWebhookPath tests webhooks with custom paths
 func GenerateV4WithCustomWebhookPath(kbc *utils.TestContext) {
 	initingTheProject(kbc)

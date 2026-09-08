@@ -17,6 +17,7 @@ limitations under the License.
 package appliers
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -65,6 +66,7 @@ func TemplatePorts(yamlContent string, resource *unstructured.Unstructured, dete
 		if strings.Contains(yamlContent, "webhook-server") {
 			yamlContent = regexp.MustCompile(`(?m)(\s*- )?containerPort:\s*\d+(\s*\n\s*name:\s*webhook-server)`).
 				ReplaceAllString(yamlContent, "${1}containerPort: {{ .Values.webhook.port }}${2}")
+			yamlContent = makeWebhookContainerPortConditional(yamlContent)
 		}
 
 		// Replace targetPort with webhook.port template (matches any numeric port)
@@ -100,14 +102,28 @@ func TemplatePorts(yamlContent string, resource *unstructured.Unstructured, dete
 		yamlContent = regexp.MustCompile(`--metrics-bind-address=(\[[^\]]*\]|[^\s:]*):([0-9]+)`).
 			ReplaceAllString(yamlContent, "--metrics-bind-address=$1:{{ .Values.metrics.port }}")
 
-		// Replace --webhook-port with templated version (matches any numeric port)
-		yamlContent = regexp.MustCompile(`--webhook-port=([0-9]+)`).
+		// Replace --webhook-port with templated version. Port -1 is the disabled branch and stays as is.
+		yamlContent = regexp.MustCompile(`--webhook-port=[1-9][0-9]*`).
 			ReplaceAllString(yamlContent, "--webhook-port={{ .Values.webhook.port }}")
 
 		yamlContent = templateHealthProbePort(yamlContent)
 	}
 
 	return yamlContent
+}
+
+// makeWebhookContainerPortConditional renders the webhook-server container port only when
+// webhook.enabled is true, since the manager does not listen on it otherwise.
+func makeWebhookContainerPortConditional(yamlContent string) string {
+	if regexp.MustCompile(`\{\{- if \.Values\.webhook\.enabled \}\}\n[ \t]+- containerPort:`).MatchString(yamlContent) {
+		return yamlContent
+	}
+	portPattern := regexp.MustCompile(`(?m)^([ \t]+)- containerPort: \{\{ \.Values\.webhook\.port \}\}\n` +
+		`[ \t]+name: webhook-server(?:\n[ \t]+protocol: \w+)?$`)
+	return portPattern.ReplaceAllStringFunc(yamlContent, func(match string) string {
+		indent, _ := LeadingWhitespace(match)
+		return fmt.Sprintf("%s{{- if .Values.webhook.enabled }}\n%s\n%s{{- end }}", indent, match, indent)
+	})
 }
 
 // templateNetworkPolicyIngressPort rewrites the port only inside the NetworkPolicy's

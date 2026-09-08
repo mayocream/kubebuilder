@@ -18,3 +18,16 @@ feature entered beta).
 Kubernetes supports the conversion webhooks as of version 1.15 (when the
 feature entered beta).
 
+## Disabling the webhook server
+
+Set `--webhook-port=-1` to disable the webhook server:
+
+```bash
+./bin/manager --webhook-port=-1
+```
+
+controller-runtime logs `Webhook server is disabled` and does not listen on any port. This needs controller-runtime `v0.25.0` or later. Older releases treat `-1` as the default `9443`.
+
+Only disable the server when no webhook configuration or CRD conversion points at the manager. Otherwise the API server cannot reach the webhooks and rejects the requests they guard.
+
+To skip webhook registration when running the manager locally with `make run`, set `ENABLE_WEBHOOKS=false` instead.

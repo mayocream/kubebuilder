@@ -205,6 +205,15 @@ For charts without conversion webhooks, install without webhooks:
 $ helm install my-release ./dist/chart --set webhook.enabled=false --set certManager.enabled=false
 ```
 
+`webhook.enabled=false` skips the webhook Service, the webhook configurations, the webhook NetworkPolicy, and the `webhook-server` container port. It also sets `--webhook-port=-1` to disable the webhook server. This works like `metrics.enabled=false`, which passes `--metrics-bind-address=0`.
+
+<aside class="note warning" role="note">
+<p class="note-title">Requires controller-runtime v0.25.0 or later</p>
+
+Older controller-runtime releases treat `--webhook-port=-1` as the default `9443`. The manager then tries to start the webhook server without a certificate and fails. See [Disabling the webhook server](../../reference/webhook-overview.md#disabling-the-webhook-server).
+
+</aside>
+
 Charts with CR version conversion reject `webhook.enabled=false`. The API server needs the webhook Service to convert custom resources.
 
 Install with NetworkPolicy resources:
@@ -266,7 +275,7 @@ For example, install the chart with the webhook server on port `9444`:
 helm install my-operator ./dist/chart --set webhook.port=9444
 ```
 
-The default is `9443`, detected from your project configuration.
+The default is `9443`, detected from your project configuration. To disable the webhook server, set `webhook.enabled=false` instead of changing the port.
 
 ### Health probe port configuration
 

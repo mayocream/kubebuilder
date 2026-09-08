@@ -659,6 +659,12 @@ func templateControllerManagerArgs(yamlContent string) string {
 		}
 	}
 
+	// Projects scaffolded before the patch added --webhook-port still need the flag so
+	// webhook.enabled=false can turn the server off.
+	if webhookLine == "" && strings.Contains(yamlContent, "name: webhook-server") {
+		webhookLine = itemIndent + "- --webhook-port={{ .Values.webhook.port }}"
+	}
+
 	var builder strings.Builder
 	builder.WriteString(indent)
 	builder.WriteString("args:\n")
@@ -695,6 +701,12 @@ func templateControllerManagerArgs(yamlContent string) string {
 		builder.WriteString("{{- if .Values.webhook.enabled }}\n")
 		builder.WriteString(webhookLine)
 		builder.WriteString("\n")
+		builder.WriteString(itemIndent)
+		builder.WriteString("{{- else }}\n")
+		builder.WriteString(itemIndent)
+		builder.WriteString("# Set -1 to disable the webhook server\n")
+		builder.WriteString(itemIndent)
+		builder.WriteString("- --webhook-port=-1\n")
 		builder.WriteString(itemIndent)
 		builder.WriteString("{{- end }}\n")
 	}
