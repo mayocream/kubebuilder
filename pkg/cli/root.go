@@ -121,44 +121,7 @@ func (c *CLI) newRootCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Check if --plugins flag contains help flags (--help, -h, help)
-			// This handles cases like: kubebuilder init --plugins --help
-			if pluginKeys, err := cmd.Flags().GetStringSlice(pluginsFlag); err == nil {
-				for _, key := range pluginKeys {
-					key = strings.TrimSpace(key)
-					if isHelpFlag(key) {
-						// Help was requested, show help and stop execution
-						cmd.SilenceUsage = true
-						cmd.SilenceErrors = true
-						_ = cmd.Help()
-						return errHelpDisplayed
-					}
-				}
-			}
-
-			if isCompletionRequest(cmd) {
-				return nil
-			}
-			// A malformed command line is reported for normal commands. Completion requests are
-			// intentionally allowed to inspect partial input.
-			if c.flagErr != nil {
-				return c.flagErr
-			}
-
-			// Cobra resolved the command, so it is now known whether it consumes the configuration.
-			if isSubcommandPathWithoutConfig(subcommandPath(cmd)) {
-				return nil
-			}
-			if c.configErr != nil {
-				return c.configErr
-			}
-			if c.configSkipped {
-				return c.resolveSkippedConfig()
-			}
-
-			return nil
-		},
+		PersistentPreRunE: c.checkCommandLine,
 	}
 
 	// Global flags for all subcommands.
@@ -172,6 +135,81 @@ func (c *CLI) newRootCmd() *cobra.Command {
 	cmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
 	return cmd
+}
+
+// checkCommandLine runs before any command. It answers a help request made through the plugins
+// flag, reports a malformed command line, and reports a project configuration that the command
+// about to run cannot use.
+func (c *CLI) checkCommandLine(cmd *cobra.Command, _ []string) error {
+	// Handles command lines like: kubebuilder init --plugins --help
+	if pluginKeys, err := cmd.Flags().GetStringSlice(pluginsFlag); err == nil {
+		for _, key := range pluginKeys {
+			key = strings.TrimSpace(key)
+			if isHelpFlag(key) {
+				cmd.SilenceUsage = true
+				cmd.SilenceErrors = true
+				_ = cmd.Help()
+				return errHelpDisplayed
+			}
+		}
+	}
+
+	if isCompletionRequest(cmd) {
+		return nil
+	}
+	// A malformed command line is reported for normal commands. Completion requests are
+	// intentionally allowed to inspect partial input.
+	if c.flagErr != nil {
+		return c.flagErr
+	}
+
+	// Cobra resolved the command, so it is now known whether it consumes the configuration.
+	if isSubcommandPathWithoutConfig(subcommandPath(cmd)) {
+		return nil
+	}
+	if c.configErr != nil {
+		return c.configErr
+	}
+	if c.configSkipped {
+		return c.resolveSkippedConfig()
+	}
+
+	return nil
+}
+
+// checkCommandLineBeforeHooks makes checkCommandLine run before the persistent pre-run hook of the
+// command and of every command below it. Cobra runs only the nearest persistent pre-run hook, so an
+// extra command with a hook of its own would otherwise skip the check of the root command. That
+// hook still runs afterwards. Subcommands added after the CLI is built are not wrapped.
+func (c *CLI) checkCommandLineBeforeHooks(cmd *cobra.Command) {
+	for _, subcommand := range cmd.Commands() {
+		c.checkCommandLineBeforeHooks(subcommand)
+	}
+
+	switch {
+	case cmd.PersistentPreRunE != nil:
+		ownHook := cmd.PersistentPreRunE
+		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			if err := c.checkCommandLine(cmd, args); err != nil {
+				return err
+			}
+
+			return ownHook(cmd, args)
+		}
+	case cmd.PersistentPreRun != nil:
+		ownHook := cmd.PersistentPreRun
+		// Cobra runs PersistentPreRunE instead of PersistentPreRun when both are set, so the hook
+		// moves there to keep running.
+		cmd.PersistentPreRun = nil
+		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			if err := c.checkCommandLine(cmd, args); err != nil {
+				return err
+			}
+			ownHook(cmd, args)
+
+			return nil
+		}
+	}
 }
 
 // rootExamples builds the examples string for the root command before resolving plugins
