@@ -821,6 +821,71 @@ var _ = Describe("Chart Generation Integration Tests", func() {
 		})
 	})
 
+	Context("Webhook server toggle (rendered)", func() {
+		// managerContainerArgs returns the manager container args from the rendered Deployment.
+		managerContainerArgs := func(rendered string) []string {
+			var args []string
+			for _, line := range strings.Split(rendered, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "- --") {
+					args = append(args, strings.TrimPrefix(trimmed, "- "))
+				}
+			}
+			return args
+		}
+
+		// containerPortNames returns every containerPort name declared in the rendered manifests.
+		containerPortNames := func(rendered string) []string {
+			var names []string
+			lines := strings.Split(rendered, "\n")
+			for i, line := range lines {
+				if strings.HasPrefix(strings.TrimSpace(line), "- containerPort:") && i+1 < len(lines) {
+					names = append(names, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[i+1]), "name:")))
+				}
+			}
+			return names
+		}
+
+		render := func(kustomizeYAML string, setArgs ...string) string {
+			out, err := helmTemplate(kustomizeYAML, setArgs...)
+			Expect(err).NotTo(HaveOccurred(), "helm template failed: %s", out)
+			return out
+		}
+
+		It("turns the webhook server off and drops its container port when webhooks are disabled", func() {
+			rendered := render(createKustomizeWithWebhookServer("test-project", true),
+				"--set", "webhook.enabled=false", "--set", "certManager.enabled=false")
+
+			args := managerContainerArgs(rendered)
+			Expect(args).To(ContainElement("--webhook-port=-1"), "rendered manager args: %v", args)
+			Expect(args).NotTo(ContainElement("--webhook-port=9443"), "rendered manager args: %v", args)
+			Expect(containerPortNames(rendered)).NotTo(ContainElement("webhook-server"))
+			Expect(rendered).NotTo(ContainSubstring("-webhook-service"))
+		})
+
+		It("keeps the webhook server listening on webhook.port when webhooks are enabled", func() {
+			rendered := render(createKustomizeWithWebhookServer("test-project", true),
+				"--set", "webhook.enabled=true", "--set", "webhook.port=9444")
+
+			args := managerContainerArgs(rendered)
+			Expect(args).To(ContainElement("--webhook-port=9444"), "rendered manager args: %v", args)
+			Expect(args).NotTo(ContainElement("--webhook-port=-1"), "rendered manager args: %v", args)
+			Expect(containerPortNames(rendered)).To(ContainElement("webhook-server"))
+			Expect(rendered).To(ContainSubstring("containerPort: 9444"))
+		})
+
+		It("still toggles the webhook server when the manifests never passed the port flag", func() {
+			manifests := createKustomizeWithWebhookServer("test-project", false)
+
+			disabled := managerContainerArgs(render(manifests,
+				"--set", "webhook.enabled=false", "--set", "certManager.enabled=false"))
+			Expect(disabled).To(ContainElement("--webhook-port=-1"), "rendered manager args: %v", disabled)
+
+			enabled := managerContainerArgs(render(manifests, "--set", "webhook.enabled=true"))
+			Expect(enabled).To(ContainElement("--webhook-port=9443"), "rendered manager args: %v", enabled)
+		})
+	})
+
 	Context("NetworkPolicy conversion from kustomize (rendered)", func() {
 		networkPolicyDoc := func(rendered, suffix string) string {
 			for _, doc := range strings.Split(rendered, "\n---") {
@@ -1643,6 +1708,50 @@ spec:
   ingress:
     - ports:
         - port: 7777
+          protocol: TCP
+`
+}
+
+// createKustomizeWithWebhookServer builds a project with admission webhooks whose manager exposes the
+// webhook-server port. passesPortFlag controls whether the Deployment args carry --webhook-port, which
+// projects scaffolded before the flag was added to manager_webhook_patch.yaml do not.
+func createKustomizeWithWebhookServer(projectName string, passesPortFlag bool) string {
+	portFlag := ""
+	if passesPortFlag {
+		portFlag = "\n        - --webhook-port=9443"
+	}
+	return createKustomizeWithWebhooks(projectName) + `---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: ` + projectName + `
+    control-plane: controller-manager
+  name: ` + projectName + `-controller-manager
+  namespace: ` + projectName + `-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - name: manager
+        image: controller:latest
+        args:
+        - --leader-elect
+        - --health-probe-bind-address=:8081` + portFlag + `
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        - containerPort: 9443
+          name: webhook-server
           protocol: TCP
 `
 }

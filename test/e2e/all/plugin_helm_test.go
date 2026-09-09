@@ -236,6 +236,55 @@ var _ = Describe("kubebuilder", func() {
 			Expect(helpers.GetMetricsServicePort(namePrefix, kbc)).To(Equal(customMetricsPort))
 		})
 
+		It("should not run the webhook server when installed with webhook.enabled=false", func() {
+			By("generating a project with admission webhooks and no conversion webhook")
+			helpers.GenerateV4WithoutConversionWebhook(kbc)
+
+			By("building installer and generating helm chart")
+			Expect(kbc.Make("build-installer")).To(Succeed())
+			Expect(kbc.EditHelmPlugin()).To(Succeed())
+
+			By("disabling webhooks and cert-manager in values.yaml")
+			valuesPath := filepath.Join(kbc.Dir, "dist", "chart", "values.yaml")
+			Expect(pluginutil.ReplaceInFile(valuesPath,
+				"webhook:\n  enabled: true", "webhook:\n  enabled: false")).To(Succeed())
+			Expect(pluginutil.ReplaceInFile(valuesPath,
+				"certManager:\n  enabled: true", "certManager:\n  enabled: false")).To(Succeed())
+
+			By("deploying without webhooks and validating the manager reconciles the sample CR")
+			helpers.Run(kbc, helpers.RunOptions{
+				HasWebhook:          false,
+				HasMetrics:          true,
+				HasNetworkPolicies:  false,
+				InstallMethod:       helpers.InstallMethodHelm,
+				SkipChartGeneration: true, // Chart already generated and customized above
+			})
+
+			By("verifying the chart tells the manager to disable the webhook server")
+			controllerPodName := helpers.GetControllerPodName(kbc)
+			args, err := kbc.Kubectl.Get(true,
+				"pod", controllerPodName, "-o", "jsonpath={.spec.containers[0].args}")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(ContainSubstring("--webhook-port=-1"))
+
+			By("verifying the container does not declare the webhook-server port")
+			portNames, err := kbc.Kubectl.Get(true,
+				"pod", controllerPodName, "-o", "jsonpath={.spec.containers[0].ports[*].name}")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(portNames).NotTo(ContainSubstring("webhook-server"))
+
+			By("verifying the manager did not start the webhook server")
+			logs, err := kbc.Kubectl.Logs(controllerPodName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(logs).To(ContainSubstring("Webhook server is disabled"))
+			Expect(logs).NotTo(ContainSubstring("Starting webhook server"))
+
+			By("verifying the webhook Service was not rendered")
+			_, err = kbc.Kubectl.Get(true,
+				"service", fmt.Sprintf("e2e-%s-webhook-service", kbc.TestSuffix))
+			Expect(err).To(HaveOccurred(), "webhook Service must not exist when webhook.enabled=false")
+		})
+
 		It("should generate a namespeced runnable project using webhooks and installed with the HelmChart", func() {
 			helpers.GenerateV4Namespaced(kbc)
 

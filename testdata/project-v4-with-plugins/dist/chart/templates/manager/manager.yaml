@@ -86,6 +86,9 @@ spec:
         - --health-probe-bind-address=:{{ .Values.manager.healthProbe.port }}
         {{- if .Values.webhook.enabled }}
         - --webhook-port={{ .Values.webhook.port }}
+        {{- else }}
+        # Set -1 to disable the webhook server
+        - --webhook-port=-1
         {{- end }}
         {{- range .Values.manager.args }}
         - {{ tpl . $ }}
@@ -124,9 +127,11 @@ spec:
         - containerPort: {{ .Values.manager.healthProbe.port }}
           name: health
           protocol: TCP
+        {{- if .Values.webhook.enabled }}
         - containerPort: {{ .Values.webhook.port }}
           name: webhook-server
           protocol: TCP
+        {{- end }}
         readinessProbe:
           httpGet:
             path: /readyz

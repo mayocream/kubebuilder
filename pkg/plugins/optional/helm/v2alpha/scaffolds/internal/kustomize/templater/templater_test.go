@@ -202,6 +202,9 @@ spec:
 			Expect(result).To(ContainSubstring("- --health-probe-bind-address=:{{ .Values.manager.healthProbe.port }}"))
 			Expect(result).To(ContainSubstring(`{{- if .Values.webhook.enabled }}
         - --webhook-port={{ .Values.webhook.port }}
+        {{- else }}
+        # Set -1 to disable the webhook server
+        - --webhook-port=-1
         {{- end }}`))
 			Expect(result).To(ContainSubstring(
 				"{{- if and .Values.certManager.enabled .Values.webhook.enabled }}\n" +
@@ -241,6 +244,30 @@ spec:
 
 			Expect(result).NotTo(ContainSubstring("--webhook-port"))
 			Expect(result).NotTo(ContainSubstring("{{- if .Values.webhook.enabled }}"))
+		})
+
+		It("keeps a single webhook.enabled guard when a templated Deployment is templated again", func() {
+			deploymentResource := &unstructured.Unstructured{}
+			deploymentResource.SetAPIVersion("apps/v1")
+			deploymentResource.SetKind("Deployment")
+			deploymentResource.SetName("test-project-controller-manager")
+
+			content := `apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP`
+
+			once := templater.ApplyHelmSubstitutions(content, deploymentResource)
+			twice := templater.ApplyHelmSubstitutions(once, deploymentResource)
+
+			Expect(strings.Count(twice, "{{- if .Values.webhook.enabled }}")).To(Equal(1))
 		})
 
 		It("should handle volume mounts with proper indentation", func() {
